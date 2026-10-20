@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>澳門手語標注筆記</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --card: #ffffff;
+    --border: #e0e0e0;
+    --text: #1a1a1a;
+    --muted: #666;
+    --accent: #2c6e49;
+    --accent-hover: #245c3d;
+    --danger: #b00020;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC",
+                 "Microsoft JhengHei", sans-serif;
+    margin: 0;
+    padding: 24px 16px 64px;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .container { max-width: 860px; margin: 0 auto; }
+  header { margin-bottom: 32px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin: 0; }
+
+  section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  h2 { font-size: 1.15rem; margin: 0 0 16px; }
+
+  form { display: flex; flex-direction: column; gap: 10px; }
+  input, textarea, button {
+    font: inherit;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text);
+    width: 100%;
+  }
+  input:focus, textarea:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+    border-color: var(--accent);
+  }
+  textarea { resize: vertical; min-height: 60px; }
+  .time-row { display: flex; gap: 10px; }
+  .time-row input { flex: 1; }
+
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--accent-hover); }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  #submit-status {
+    margin: 8px 0 0;
+    font-size: 0.9rem;
+    min-height: 1.4em;
+  }
+  #submit-status.ok { color: var(--accent); }
+  #submit-status.err { color: var(--danger); }
+
+  .video-card {
+    border-top: 1px solid var(--border);
+    padding: 16px 0;
+  }
+  .video-card:first-of-type { border-top: none; padding-top: 0; }
+  .video-card h3 { font-size: 1rem; margin: 0 0 4px; }
+  .video-card a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.85rem;
+    word-break: break-all;
+  }
+  .video-card a:hover { text-decoration: underline; }
+  .video-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 12px 0 0;
+  }
+  .video-card li {
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 0.92rem;
+  }
+  .video-card li:last-child { border-bottom: none; }
+  .video-card strong { color: var(--accent); }
+  .time {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+    background: #f0f0f0;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  .notes { color: var(--muted); font-size: 0.85rem; }
+  .conf { font-size: 0.75rem; color: var(--muted); }
+
+  .empty { color: var(--muted); font-style: italic; }
+  #search-input { margin-bottom: 16px; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 32px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Glossbook</h1>
+    <p class="subtitle">澳門手語標注筆記 · 階段一 MVP</p>
+  </header>
+
+  <section id="submit-section">
+    <h2>新增標注</h2>
+    <form id="annotation-form">
+      <input type="url" id="video-url" placeholder="YouTube 影片網址，例如 https://www.youtube.com/watch?v=xxxxxxxxxxx" required>
+      <input type="text" id="video-title" placeholder="影片標題" required>
+
+      <div class="time-row">
+        <input type="number" id="start-ms" placeholder="開始時間（毫秒），例如 12345" required min="0">
+        <input type="number" id="end-ms" placeholder="結束時間（毫秒，可空）" min="0">
+      </div>
+
+      <input type="text" id="label" placeholder="單詞意思，例如：謝謝" required>
+      <input type="number" id="confidence" placeholder="信心度 1–5（可空）" min="1" max="5">
+      <textarea id="notes" placeholder="備註（可空）"></textarea>
+
+      <button type="submit" id="submit-btn">提交標注</button>
+    </form>
+    <p id="submit-status"></p>
+  </section>
+
+  <section id="list-section">
+    <h2>所有標注</h2>
+    <input type="text" id="search-input" placeholder="按網址、標題或單詞搜尋…">
+    <div id="annotation-list">
+      <p class="empty">載入中…</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>資料以 CC0 釋出 · 開源於 GitHub</p>
+  </footer>
+
+</div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+// ============================================================
+// ⚠️ 只有這兩行需要你改
+// ============================================================
+const SUPABASE_URL = 'https://ngvqqwnbwbxdscelolej.supabase.co/rest/v1/';          // 例如 https://xxxx.supabase.co
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ndnFxd25id2J4ZHNjZWxvbGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MDU2OTksImV4cCI6MjEwODA4MTY5OX0.mV5OWv_8IjNIj0ggqPwSjokbc4moWNpuf5tjF9_3y7U';        // Project Settings → API → anon public key
+// ============================================================
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ---------- 工具函式 ----------
+
+function extractVideoId(url) {
+  const regex = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+}
+
+function normalizeUrl(videoId) {
+  return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
+function formatMs(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
+// ---------- 提交 ----------
+
+const form = document.getElementById('annotation-form');
+const statusEl = document.getElementById('submit-status');
+const submitBtn = document.getElementById('submit-btn');
+
+function setStatus(msg, type) {
+  statusEl.textContent = msg;
+  statusEl.className = type || '';
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setStatus('提交中…');
+
+  const rawUrl = document.getElementById('video-url').value.trim();
+  const videoId = extractVideoId(rawUrl);
+  if (!videoId) {
+    setStatus('網址格式不正確，只接受 YouTube 連結。', 'err');
+    return;
+  }
+
+  const endMsRaw = document.getElementById('end-ms').value.trim();
+  const confidenceRaw = document.getElementById('confidence').value.trim();
+  const notesRaw = document.getElementById('notes').value.trim();
+
+  const payload = {
+    video_id: videoId,
+    video_url: normalizeUrl(videoId),
+    video_title: document.getElementById('video-title').value.trim(),
+    start_ms: Number(document.getElementById('start-ms').value),
+    end_ms: endMsRaw ? Number(endMsRaw) : null,
+    label: document.getElementById('label').value.trim(),
+    confidence: confidenceRaw ? Number(confidenceRaw) : null,
+    notes: notesRaw || null,
+  };
+
+  submitBtn.disabled = true;
+  const { error } = await supabase.from('annotations').insert(payload);
+  submitBtn.disabled = false;
+
+  if (error) {
+    setStatus(`提交失敗：${error.message}`, 'err');
+    return;
+  }
+
+  setStatus('提交成功。', 'ok');
+  form.reset();
+  loadAnnotations();
+});
+
+// ---------- 列表與查詢 ----------
+
+let allAnnotations = [];
+const listEl = document.getElementById('annotation-list');
+const searchEl = document.getElementById('search-input');
+
+async function loadAnnotations() {
+  const { data, error } = await supabase
+    .from('annotations')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    listEl.innerHTML = `<p class="empty">載入失敗：${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  allAnnotations = data || [];
+  renderList(allAnnotations);
+}
+
+function renderList(annotations) {
+  if (!annotations.length) {
+    listEl.innerHTML = '<p class="empty">還沒有任何標注。</p>';
+    return;
+  }
+
+  // 按 video_id 分組
+  const grouped = new Map();
+  for (const a of annotations) {
+    if (!grouped.has(a.video_id)) grouped.set(a.video_id, []);
+    grouped.get(a.video_id).push(a);
+  }
+
+  const html = [];
+  for (const [videoId, items] of grouped) {
+    // 按時間排序
+    items.sort((x, y) => x.start_ms - y.start_ms);
+    const first = items[0];
+
+    const itemHtml = items.map(item => {
+      const timeStr = item.end_ms
+        ? `${formatMs(item.start_ms)} – ${formatMs(item.end_ms)}`
+        : formatMs(item.start_ms);
+      const confStr = item.confidence
+        ? `<span class="conf">信心 ${item.confidence}/5</span>`
+        : '';
+      const notesStr = item.notes
+        ? `<span class="notes">${escapeHtml(item.notes)}</span>`
+        : '';
+      return `
+        <li>
+          <strong>${escapeHtml(item.label)}</strong>
+          <span class="time">${timeStr}</span>
+          ${confStr}
+          ${notesStr}
+        </li>
+      `;
+    }).join('');
+
+    html.push(`
+      <div class="video-card">
+        <h3>${escapeHtml(first.video_title)}</h3>
+        <a href="${escapeHtml(first.video_url)}" target="_blank" rel="noopener">
+          ${escapeHtml(first.video_url)}
+        </a>
+        <ul>${itemHtml}</ul>
+      </div>
+    `);
+  }
+  listEl.innerHTML = html.join('');
+}
+
+searchEl.addEventListener('input', () => {
+  const q = searchEl.value.trim().toLowerCase();
+  if (!q) {
+    renderList(allAnnotations);
+    return;
+  }
+  const filtered = allAnnotations.filter(a =>
+    a.video_url.toLowerCase().includes(q) ||
+    a.video_title.toLowerCase().includes(q) ||
+    a.label.toLowerCase().includes(q)
+  );
+  renderList(filtered);
+});
+
+// ---------- 啟動 ----------
+
+if (SUPABASE_URL === 'YOUR_PROJECT_URL') {
+  listEl.innerHTML = '<p class="empty">尚未設定 Supabase 連線，請修改 index.html 開頭的 SUPABASE_URL 和 SUPABASE_ANON_KEY。</p>';
+} else {
+  loadAnnotations();
+}
+</script>
+</body>
+</html>
