@@ -70,6 +70,11 @@
   button:hover { background: var(--accent-hover); }
   button:disabled { opacity: 0.6; cursor: not-allowed; }
 
+  .btn-row { display: flex; gap: 8px; }
+  .btn-row button[type="submit"] { flex: 2; }
+  .btn-row #clear-video-btn { flex: 1; background: #888; }
+  .btn-row #clear-video-btn:hover { background: #666; }
+
   #submit-status {
     margin: 8px 0 0;
     font-size: 0.9rem;
@@ -117,6 +122,7 @@
   }
   .notes { color: var(--muted); font-size: 0.85rem; }
   .conf { font-size: 0.75rem; color: var(--muted); }
+  .standard { font-size: 0.7rem; color: var(--accent); }
 
   .empty { color: var(--muted); font-style: italic; }
   #search-input { margin-bottom: 16px; }
@@ -134,7 +140,7 @@
 
   <header>
     <h1>澳門手語標注筆記</h1>
-    <p class="subtitle">澳門手語標注筆記 · 階段一 MVP</p>
+    <p class="subtitle">階段二 A · 詞彙庫對齊</p>
   </header>
 
   <section id="submit-section">
@@ -149,13 +155,16 @@
       </div>
       <p class="hint">格式：分:秒（1:23）或 時:分:秒（1:02:03）。純數字視為秒數（83 = 1:23）。</p>
 
-      <input type="text" id="label" placeholder="單詞意思，例如：謝謝" required>
+      <input type="text" id="label" list="vocab-list" placeholder="單詞意思，可從下拉選或自由輸入" required autocomplete="off">
+      <datalist id="vocab-list"></datalist>
+      <p class="hint" id="vocab-status">詞彙庫載入中…</p>
+
       <input type="number" id="confidence" placeholder="信心度 1–5（可空）" min="1" max="5">
       <textarea id="notes" placeholder="備註（可空）"></textarea>
 
-      <div style="display:flex; gap:8px;">
-        <button type="submit" id="submit-btn" style="flex:2;">提交標注</button>
-        <button type="button" id="clear-video-btn" style="flex:1; background:#888;">清除影片資訊</button>
+      <div class="btn-row">
+        <button type="submit" id="submit-btn">提交標注</button>
+        <button type="button" id="clear-video-btn">清除影片資訊</button>
       </div>
     </form>
     <p id="submit-status"></p>
@@ -195,7 +204,7 @@ if (configError) {
   main(createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
 }
 
-// ---------- 工具函式（不依賴 supabase） ----------
+// ---------- 工具函式 ----------
 
 function extractVideoId(url) {
   const regex = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/;
@@ -207,29 +216,22 @@ function normalizeUrl(videoId) {
   return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
-// 把 "1:23" / "1:02:03" / "83" 轉成毫秒；解析失敗回傳 NaN
 function parseTimeToMs(input) {
   const s = String(input).trim();
   if (!s) return NaN;
-
-  // 純數字：視為秒數，允許小數
   if (/^\d+(\.\d+)?$/.test(s)) {
     return Math.round(parseFloat(s) * 1000);
   }
-
-  // 分:秒 或 時:分:秒
   const parts = s.split(':');
   if (parts.length < 2 || parts.length > 3) return NaN;
-
   let total = 0;
   for (const part of parts) {
-    if (!/^\d+$/.test(part)) return NaN;  // 每段必須是整數
+    if (!/^\d+$/.test(part)) return NaN;
     total = total * 60 + parseInt(part, 10);
   }
   return total * 1000;
 }
 
-// 毫秒轉回 m:ss 或 h:mm:ss，供顯示
 function formatMs(ms) {
   const totalSec = Math.floor(ms / 1000);
   const h = Math.floor(totalSec / 3600);
@@ -247,7 +249,31 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ---------- 主邏輯（依賴 supabase） ----------
+// ---------- 詞彙庫 ----------
+
+let vocabSet = new Set();  // 用於快速判斷輸入是否為標準詞
+
+async function loadVocab() {
+  const statusEl = document.getElementById('vocab-status');
+  const datalist = document.getElementById('vocab-list');
+  try {
+    const res = await fetch('./vocab.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const words = await res.json();
+    if (!Array.isArray(words)) throw new Error('vocab.json 必須是字符串數組');
+
+    vocabSet = new Set(words);
+    datalist.innerHTML = words
+      .map(w => `<option value="${escapeHtml(w)}"></option>`)
+      .join('');
+    statusEl.textContent = `詞彙庫已載入 ${words.length} 個詞。可從下拉選或自由輸入。`;
+  } catch (err) {
+    statusEl.textContent = `詞彙庫載入失敗：${err.message}。仍可自由輸入。`;
+    statusEl.style.color = '#b00020';
+  }
+}
+
+// ---------- 主邏輯 ----------
 
 function main(supabase) {
   const form = document.getElementById('annotation-form');
@@ -263,11 +289,12 @@ function main(supabase) {
     statusEl.className = type || '';
   }
 
+  // 清除影片資訊
   document.getElementById('clear-video-btn').addEventListener('click', () => {
     document.getElementById('video-url').value = '';
     document.getElementById('video-title').value = '';
   });
-  
+
   // 提交
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -300,6 +327,16 @@ function main(supabase) {
       }
     }
 
+    const labelValue = document.getElementById('label').value.trim();
+    if (!labelValue) {
+      setStatus('請填寫單詞意思。', 'err');
+      return;
+    }
+
+    // 如果 label 在詞彙庫裡，gloss 也填同一個詞；否則 gloss 為 null
+    const isStandard = vocabSet.has(labelValue);
+    const glossValue = isStandard ? labelValue : null;
+
     const confidenceRaw = document.getElementById('confidence').value.trim();
     const notesRaw = document.getElementById('notes').value.trim();
 
@@ -309,7 +346,8 @@ function main(supabase) {
       video_title: document.getElementById('video-title').value.trim(),
       start_ms: startMs,
       end_ms: endMs,
-      label: document.getElementById('label').value.trim(),
+      label: labelValue,
+      gloss: glossValue,
       confidence: confidenceRaw ? Number(confidenceRaw) : null,
       notes: notesRaw || null,
     };
@@ -323,13 +361,20 @@ function main(supabase) {
       return;
     }
 
-    setStatus('提交成功。', 'ok');
+    setStatus(
+      isStandard
+        ? '提交成功（標準詞）。'
+        : '提交成功（自由詞，未對齊詞彙庫）。',
+      'ok'
+    );
+
+    // 只清空時間、單詞、信心、備註，保留網址和標題
     document.getElementById('start-input').value = '';
     document.getElementById('end-input').value = '';
     document.getElementById('label').value = '';
     document.getElementById('confidence').value = '';
     document.getElementById('notes').value = '';
-    // 保留 video-url 和 video-title，方便同影片連續標注
+
     loadAnnotations();
   });
 
@@ -361,7 +406,7 @@ function main(supabase) {
     }
 
     const html = [];
-    for (const [videoId, items] of grouped) {
+    for (const [, items] of grouped) {
       items.sort((x, y) => x.start_ms - y.start_ms);
       const first = items[0];
 
@@ -375,10 +420,14 @@ function main(supabase) {
         const notesStr = item.notes
           ? `<span class="notes">${escapeHtml(item.notes)}</span>`
           : '';
+        const standardStr = item.gloss
+          ? '<span class="standard">標準詞</span>'
+          : '';
         return `
           <li>
             <strong>${escapeHtml(item.label)}</strong>
             <span class="time">${timeStr}</span>
+            ${standardStr}
             ${confStr}
             ${notesStr}
           </li>
@@ -413,6 +462,7 @@ function main(supabase) {
   });
 
   // 啟動
+  loadVocab();
   loadAnnotations();
 }
 </script>
