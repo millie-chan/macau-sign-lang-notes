@@ -153,7 +153,10 @@
       <input type="number" id="confidence" placeholder="信心度 1–5（可空）" min="1" max="5">
       <textarea id="notes" placeholder="備註（可空）"></textarea>
 
-      <button type="submit" id="submit-btn">提交標注</button>
+      <div style="display:flex; gap:8px;">
+        <button type="submit" id="submit-btn" style="flex:2;">提交標注</button>
+        <button type="button" id="clear-video-btn" style="flex:1; background:#888;">清除影片資訊</button>
+      </div>
     </form>
     <p id="submit-status"></p>
   </section>
@@ -260,6 +263,11 @@ function main(supabase) {
     statusEl.className = type || '';
   }
 
+  document.getElementById('clear-video-btn').addEventListener('click', () => {
+    document.getElementById('video-url').value = '';
+    document.getElementById('video-title').value = '';
+  });
+  
   // 提交
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -316,7 +324,12 @@ function main(supabase) {
     }
 
     setStatus('提交成功。', 'ok');
-    form.reset();
+    document.getElementById('start-input').value = '';
+    document.getElementById('end-input').value = '';
+    document.getElementById('label').value = '';
+    document.getElementById('confidence').value = '';
+    document.getElementById('notes').value = '';
+    // 保留 video-url 和 video-title，方便同影片連續標注
     loadAnnotations();
   });
 
