@@ -1,0 +1,2 @@
+export const SUPABASE_URL = 'https://ngvqqwnbwbxdscelolej.supabase.co';          // 例如 https://xxxx.supabase.co
+export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ndnFxd25id2J4ZHNjZWxvbGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MDU2OTksImV4cCI6MjEwODA4MTY5OX0.mV5OWv_8IjNIj0ggqPwSjokbc4moWNpuf5tjF9_3y7U';        // Project Settings → API → anon public key

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Glossbook — 澳門手語標注筆記</title>
+<title>澳門手語標注筆記</title>
 <style>
   :root {
     --bg: #fafafa;
@@ -133,7 +133,7 @@
 <div class="container">
 
   <header>
-    <h1>Glossbook</h1>
+    <h1>澳門手語標注筆記</h1>
     <p class="subtitle">澳門手語標注筆記 · 階段一 MVP</p>
   </header>
 
@@ -173,18 +173,26 @@
 </div>
 
 <script type="module">
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-// ============================================================
-// ⚠️ 只有這兩行需要你改
-// ============================================================
-const SUPABASE_URL = 'YOUR_PROJECT_URL';          // 例如 https://xxxx.supabase.co
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';        // Project Settings → API → anon public key
-// ============================================================
+// ---------- 配置檢查 ----------
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const configError =
+  !SUPABASE_URL || !SUPABASE_URL.startsWith('https://')
+    ? 'SUPABASE_URL 必須是 https:// 開頭的完整網址'
+  : !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === 'YOUR_ANON_KEY'
+    ? 'SUPABASE_ANON_KEY 尚未填寫'
+  : null;
 
-// ---------- 工具函式 ----------
+if (configError) {
+  document.getElementById('annotation-list').innerHTML =
+    `<p class="empty">配置錯誤：${configError}。請修改 config.js 後強制重新整理（Ctrl+Shift+R / Cmd+Shift+R）。</p>`;
+} else {
+  main(createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
+}
+
+// ---------- 工具函式（不依賴 supabase） ----------
 
 function extractVideoId(url) {
   const regex = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([A-Za-z0-9_-]{11})/;
@@ -201,7 +209,7 @@ function parseTimeToMs(input) {
   const s = String(input).trim();
   if (!s) return NaN;
 
-  // 純數字：視為秒數
+  // 純數字：視為秒數，允許小數
   if (/^\d+(\.\d+)?$/.test(s)) {
     return Math.round(parseFloat(s) * 1000);
   }
@@ -211,12 +219,11 @@ function parseTimeToMs(input) {
   if (parts.length < 2 || parts.length > 3) return NaN;
 
   let total = 0;
-  for (let i = 0; i < parts.length; i++) {
-    const v = parseFloat(parts[i]);
-    if (isNaN(v) || v < 0) return NaN;
-    total = total * 60 + v;
+  for (const part of parts) {
+    if (!/^\d+$/.test(part)) return NaN;  // 每段必須是整數
+    total = total * 60 + parseInt(part, 10);
   }
-  return Math.round(total * 1000);
+  return total * 1000;
 }
 
 // 毫秒轉回 m:ss 或 h:mm:ss，供顯示
@@ -237,165 +244,162 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ---------- 提交 ----------
+// ---------- 主邏輯（依賴 supabase） ----------
 
-const form = document.getElementById('annotation-form');
-const statusEl = document.getElementById('submit-status');
-const submitBtn = document.getElementById('submit-btn');
+function main(supabase) {
+  const form = document.getElementById('annotation-form');
+  const statusEl = document.getElementById('submit-status');
+  const submitBtn = document.getElementById('submit-btn');
+  const listEl = document.getElementById('annotation-list');
+  const searchEl = document.getElementById('search-input');
 
-function setStatus(msg, type) {
-  statusEl.textContent = msg;
-  statusEl.className = type || '';
-}
+  let allAnnotations = [];
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setStatus('提交中…');
-
-  const rawUrl = document.getElementById('video-url').value.trim();
-  const videoId = extractVideoId(rawUrl);
-  if (!videoId) {
-    setStatus('網址格式不正確，只接受 YouTube 連結。', 'err');
-    return;
+  function setStatus(msg, type) {
+    statusEl.textContent = msg;
+    statusEl.className = type || '';
   }
 
-  const startMs = parseTimeToMs(document.getElementById('start-input').value);
-  if (isNaN(startMs)) {
-    setStatus('開始時間格式不正確，請用 1:23 這種格式。', 'err');
-    return;
-  }
+  // 提交
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setStatus('提交中…');
 
-  const endInput = document.getElementById('end-input').value.trim();
-  let endMs = null;
-  if (endInput) {
-    endMs = parseTimeToMs(endInput);
-    if (isNaN(endMs)) {
-      setStatus('結束時間格式不正確，請用 1:25 這種格式，或留空。', 'err');
+    const rawUrl = document.getElementById('video-url').value.trim();
+    const videoId = extractVideoId(rawUrl);
+    if (!videoId) {
+      setStatus('網址格式不正確，只接受 YouTube 連結。', 'err');
       return;
     }
-    if (endMs < startMs) {
-      setStatus('結束時間不能早於開始時間。', 'err');
+
+    const startMs = parseTimeToMs(document.getElementById('start-input').value);
+    if (isNaN(startMs)) {
+      setStatus('開始時間格式不正確，請用 1:23 這種格式。', 'err');
       return;
     }
-  }
 
-  const confidenceRaw = document.getElementById('confidence').value.trim();
-  const notesRaw = document.getElementById('notes').value.trim();
+    const endInput = document.getElementById('end-input').value.trim();
+    let endMs = null;
+    if (endInput) {
+      endMs = parseTimeToMs(endInput);
+      if (isNaN(endMs)) {
+        setStatus('結束時間格式不正確，請用 1:25 這種格式，或留空。', 'err');
+        return;
+      }
+      if (endMs < startMs) {
+        setStatus('結束時間不能早於開始時間。', 'err');
+        return;
+      }
+    }
 
-  const payload = {
-    video_id: videoId,
-    video_url: normalizeUrl(videoId),
-    video_title: document.getElementById('video-title').value.trim(),
-    start_ms: startMs,
-    end_ms: endMs,
-    label: document.getElementById('label').value.trim(),
-    confidence: confidenceRaw ? Number(confidenceRaw) : null,
-    notes: notesRaw || null,
-  };
+    const confidenceRaw = document.getElementById('confidence').value.trim();
+    const notesRaw = document.getElementById('notes').value.trim();
 
-  submitBtn.disabled = true;
-  const { error } = await supabase.from('annotations').insert(payload);
-  submitBtn.disabled = false;
+    const payload = {
+      video_id: videoId,
+      video_url: normalizeUrl(videoId),
+      video_title: document.getElementById('video-title').value.trim(),
+      start_ms: startMs,
+      end_ms: endMs,
+      label: document.getElementById('label').value.trim(),
+      confidence: confidenceRaw ? Number(confidenceRaw) : null,
+      notes: notesRaw || null,
+    };
 
-  if (error) {
-    setStatus(`提交失敗：${error.message}`, 'err');
-    return;
-  }
+    submitBtn.disabled = true;
+    const { error } = await supabase.from('annotations').insert(payload);
+    submitBtn.disabled = false;
 
-  setStatus('提交成功。', 'ok');
-  form.reset();
-  loadAnnotations();
-});
+    if (error) {
+      setStatus(`提交失敗：${error.message}`, 'err');
+      return;
+    }
 
-// ---------- 列表與查詢 ----------
+    setStatus('提交成功。', 'ok');
+    form.reset();
+    loadAnnotations();
+  });
 
-let allAnnotations = [];
-const listEl = document.getElementById('annotation-list');
-const searchEl = document.getElementById('search-input');
+  // 列表與查詢
+  async function loadAnnotations() {
+    const { data, error } = await supabase
+      .from('annotations')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-async function loadAnnotations() {
-  const { data, error } = await supabase
-    .from('annotations')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    listEl.innerHTML = `<p class="empty">載入失敗：${escapeHtml(error.message)}</p>`;
-    return;
-  }
-  allAnnotations = data || [];
-  renderList(allAnnotations);
-}
-
-function renderList(annotations) {
-  if (!annotations.length) {
-    listEl.innerHTML = '<p class="empty">還沒有任何標注。</p>';
-    return;
-  }
-
-  const grouped = new Map();
-  for (const a of annotations) {
-    if (!grouped.has(a.video_id)) grouped.set(a.video_id, []);
-    grouped.get(a.video_id).push(a);
-  }
-
-  const html = [];
-  for (const [videoId, items] of grouped) {
-    items.sort((x, y) => x.start_ms - y.start_ms);
-    const first = items[0];
-
-    const itemHtml = items.map(item => {
-      const timeStr = item.end_ms
-        ? `${formatMs(item.start_ms)} – ${formatMs(item.end_ms)}`
-        : formatMs(item.start_ms);
-      const confStr = item.confidence
-        ? `<span class="conf">信心 ${item.confidence}/5</span>`
-        : '';
-      const notesStr = item.notes
-        ? `<span class="notes">${escapeHtml(item.notes)}</span>`
-        : '';
-      return `
-        <li>
-          <strong>${escapeHtml(item.label)}</strong>
-          <span class="time">${timeStr}</span>
-          ${confStr}
-          ${notesStr}
-        </li>
-      `;
-    }).join('');
-
-    html.push(`
-      <div class="video-card">
-        <h3>${escapeHtml(first.video_title)}</h3>
-        <a href="${escapeHtml(first.video_url)}" target="_blank" rel="noopener">
-          ${escapeHtml(first.video_url)}
-        </a>
-        <ul>${itemHtml}</ul>
-      </div>
-    `);
-  }
-  listEl.innerHTML = html.join('');
-}
-
-searchEl.addEventListener('input', () => {
-  const q = searchEl.value.trim().toLowerCase();
-  if (!q) {
+    if (error) {
+      listEl.innerHTML = `<p class="empty">載入失敗：${escapeHtml(error.message)}</p>`;
+      return;
+    }
+    allAnnotations = data || [];
     renderList(allAnnotations);
-    return;
   }
-  const filtered = allAnnotations.filter(a =>
-    a.video_url.toLowerCase().includes(q) ||
-    a.video_title.toLowerCase().includes(q) ||
-    a.label.toLowerCase().includes(q)
-  );
-  renderList(filtered);
-});
 
-// ---------- 啟動 ----------
+  function renderList(annotations) {
+    if (!annotations.length) {
+      listEl.innerHTML = '<p class="empty">還沒有任何標注。</p>';
+      return;
+    }
 
-if (SUPABASE_URL === 'YOUR_PROJECT_URL') {
-  listEl.innerHTML = '<p class="empty">尚未設定 Supabase 連線，請修改 index.html 開頭的 SUPABASE_URL 和 SUPABASE_ANON_KEY。</p>';
-} else {
+    const grouped = new Map();
+    for (const a of annotations) {
+      if (!grouped.has(a.video_id)) grouped.set(a.video_id, []);
+      grouped.get(a.video_id).push(a);
+    }
+
+    const html = [];
+    for (const [videoId, items] of grouped) {
+      items.sort((x, y) => x.start_ms - y.start_ms);
+      const first = items[0];
+
+      const itemHtml = items.map(item => {
+        const timeStr = item.end_ms
+          ? `${formatMs(item.start_ms)} – ${formatMs(item.end_ms)}`
+          : formatMs(item.start_ms);
+        const confStr = item.confidence
+          ? `<span class="conf">信心 ${item.confidence}/5</span>`
+          : '';
+        const notesStr = item.notes
+          ? `<span class="notes">${escapeHtml(item.notes)}</span>`
+          : '';
+        return `
+          <li>
+            <strong>${escapeHtml(item.label)}</strong>
+            <span class="time">${timeStr}</span>
+            ${confStr}
+            ${notesStr}
+          </li>
+        `;
+      }).join('');
+
+      html.push(`
+        <div class="video-card">
+          <h3>${escapeHtml(first.video_title)}</h3>
+          <a href="${escapeHtml(first.video_url)}" target="_blank" rel="noopener">
+            ${escapeHtml(first.video_url)}
+          </a>
+          <ul>${itemHtml}</ul>
+        </div>
+      `);
+    }
+    listEl.innerHTML = html.join('');
+  }
+
+  searchEl.addEventListener('input', () => {
+    const q = searchEl.value.trim().toLowerCase();
+    if (!q) {
+      renderList(allAnnotations);
+      return;
+    }
+    const filtered = allAnnotations.filter(a =>
+      a.video_url.toLowerCase().includes(q) ||
+      a.video_title.toLowerCase().includes(q) ||
+      a.label.toLowerCase().includes(q)
+    );
+    renderList(filtered);
+  });
+
+  // 啟動
   loadAnnotations();
 }
 </script>
