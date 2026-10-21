@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>澳門手語標注筆記</title>
+<title>Glossbook — 澳門手語標注筆記</title>
 <style>
   :root {
     --bg: #fafafa;
@@ -57,6 +57,7 @@
   textarea { resize: vertical; min-height: 60px; }
   .time-row { display: flex; gap: 10px; }
   .time-row input { flex: 1; }
+  .hint { font-size: 0.8rem; color: var(--muted); margin: -4px 0 0; }
 
   button {
     background: var(--accent);
@@ -143,9 +144,10 @@
       <input type="text" id="video-title" placeholder="影片標題" required>
 
       <div class="time-row">
-        <input type="number" id="start-ms" placeholder="開始時間（毫秒），例如 12345" required min="0">
-        <input type="number" id="end-ms" placeholder="結束時間（毫秒，可空）" min="0">
+        <input type="text" id="start-input" placeholder="開始時間，例如 1:23 或 1:02:03" required>
+        <input type="text" id="end-input" placeholder="結束時間（可空），例如 1:25">
       </div>
+      <p class="hint">格式：分:秒（1:23）或 時:分:秒（1:02:03）。純數字視為秒數（83 = 1:23）。</p>
 
       <input type="text" id="label" placeholder="單詞意思，例如：謝謝" required>
       <input type="number" id="confidence" placeholder="信心度 1–5（可空）" min="1" max="5">
@@ -176,8 +178,8 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 // ============================================================
 // ⚠️ 只有這兩行需要你改
 // ============================================================
-const SUPABASE_URL = 'https://ngvqqwnbwbxdscelolej.supabase.co/rest/v1/';          // 例如 https://xxxx.supabase.co
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ndnFxd25id2J4ZHNjZWxvbGVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MDU2OTksImV4cCI6MjEwODA4MTY5OX0.mV5OWv_8IjNIj0ggqPwSjokbc4moWNpuf5tjF9_3y7U';        // Project Settings → API → anon public key
+const SUPABASE_URL = 'YOUR_PROJECT_URL';          // 例如 https://xxxx.supabase.co
+const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';        // Project Settings → API → anon public key
 // ============================================================
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -194,10 +196,39 @@ function normalizeUrl(videoId) {
   return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
+// 把 "1:23" / "1:02:03" / "83" 轉成毫秒；解析失敗回傳 NaN
+function parseTimeToMs(input) {
+  const s = String(input).trim();
+  if (!s) return NaN;
+
+  // 純數字：視為秒數
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    return Math.round(parseFloat(s) * 1000);
+  }
+
+  // 分:秒 或 時:分:秒
+  const parts = s.split(':');
+  if (parts.length < 2 || parts.length > 3) return NaN;
+
+  let total = 0;
+  for (let i = 0; i < parts.length; i++) {
+    const v = parseFloat(parts[i]);
+    if (isNaN(v) || v < 0) return NaN;
+    total = total * 60 + v;
+  }
+  return Math.round(total * 1000);
+}
+
+// 毫秒轉回 m:ss 或 h:mm:ss，供顯示
 function formatMs(ms) {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  return `${m}:${String(s % 60).padStart(2, '0')}`;
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function escapeHtml(str) {
@@ -228,7 +259,26 @@ form.addEventListener('submit', async (e) => {
     return;
   }
 
-  const endMsRaw = document.getElementById('end-ms').value.trim();
+  const startMs = parseTimeToMs(document.getElementById('start-input').value);
+  if (isNaN(startMs)) {
+    setStatus('開始時間格式不正確，請用 1:23 這種格式。', 'err');
+    return;
+  }
+
+  const endInput = document.getElementById('end-input').value.trim();
+  let endMs = null;
+  if (endInput) {
+    endMs = parseTimeToMs(endInput);
+    if (isNaN(endMs)) {
+      setStatus('結束時間格式不正確，請用 1:25 這種格式，或留空。', 'err');
+      return;
+    }
+    if (endMs < startMs) {
+      setStatus('結束時間不能早於開始時間。', 'err');
+      return;
+    }
+  }
+
   const confidenceRaw = document.getElementById('confidence').value.trim();
   const notesRaw = document.getElementById('notes').value.trim();
 
@@ -236,8 +286,8 @@ form.addEventListener('submit', async (e) => {
     video_id: videoId,
     video_url: normalizeUrl(videoId),
     video_title: document.getElementById('video-title').value.trim(),
-    start_ms: Number(document.getElementById('start-ms').value),
-    end_ms: endMsRaw ? Number(endMsRaw) : null,
+    start_ms: startMs,
+    end_ms: endMs,
     label: document.getElementById('label').value.trim(),
     confidence: confidenceRaw ? Number(confidenceRaw) : null,
     notes: notesRaw || null,
@@ -283,7 +333,6 @@ function renderList(annotations) {
     return;
   }
 
-  // 按 video_id 分組
   const grouped = new Map();
   for (const a of annotations) {
     if (!grouped.has(a.video_id)) grouped.set(a.video_id, []);
@@ -292,7 +341,6 @@ function renderList(annotations) {
 
   const html = [];
   for (const [videoId, items] of grouped) {
-    // 按時間排序
     items.sort((x, y) => x.start_ms - y.start_ms);
     const first = items[0];
 
