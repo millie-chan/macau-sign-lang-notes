@@ -68,7 +68,6 @@
   button:hover { background: var(--accent-hover); }
   button:disabled { opacity: 0.6; cursor: not-allowed; }
 
-  /* 影片區 */
   .video-inputs { display: flex; flex-direction: column; gap: 8px; }
   .url-row { display: flex; gap: 8px; }
   .url-row input { flex: 1; }
@@ -92,7 +91,6 @@
     display: block;
   }
 
-  /* 多行標注 */
   .annotation-row {
     display: flex;
     flex-wrap: wrap;
@@ -166,7 +164,6 @@
   #submit-status.ok { color: var(--accent); }
   #submit-status.err { color: var(--danger); }
 
-  /* 現有標注清單 */
   .current-annotations {
     margin-top: 12px;
     padding: 12px;
@@ -249,7 +246,6 @@
     <p class="subtitle">階段二 B · 播放器 + 多詞提交</p>
   </header>
 
-  <!-- 影片區 -->
   <section id="video-section">
     <h2>影片</h2>
     <div class="video-inputs">
@@ -267,7 +263,6 @@
     <div id="current-annotations-container"></div>
   </section>
 
-  <!-- 多行標注 -->
   <section id="annotations-section">
     <h2>新增標注</h2>
     <p class="hint">
@@ -284,7 +279,6 @@
     <p id="submit-status"></p>
   </section>
 
-  <!-- 所有標注 -->
   <section id="list-section">
     <h2>所有標注</h2>
     <input type="text" id="search-input" placeholder="按網址、標題或單詞搜尋…">
@@ -304,8 +298,6 @@
 <script type="module">
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
-// ---------- 配置檢查 ----------
 
 const configError =
   !SUPABASE_URL || !SUPABASE_URL.startsWith('https://')
@@ -366,19 +358,43 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ---------- 詞彙庫 ----------
+// ---------- 詞彙庫（新版：gloss + labels） ----------
 
-let vocabSet = new Set();
+let labelToGloss = new Map();  // 中文詞 → 手語詞條 gloss
+let allLabels = [];            // 所有可選中文詞，給 datalist
 
 async function loadVocab() {
   const datalist = document.getElementById('vocab-list');
   try {
     const res = await fetch('./vocab.json', { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const words = await res.json();
-    if (!Array.isArray(words)) throw new Error('vocab.json 必須是字符串數組');
-    vocabSet = new Set(words);
-    datalist.innerHTML = words.map(w => `<option value="${escapeHtml(w)}"></option>`).join('');
+    const entries = await res.json();
+    if (!Array.isArray(entries)) throw new Error('vocab.json 必須是數組');
+
+    labelToGloss = new Map();
+    allLabels = [];
+
+    for (const entry of entries) {
+      if (!entry || typeof entry.gloss !== 'string' || !Array.isArray(entry.labels)) {
+        console.warn('忽略格式不正確的詞條：', entry);
+        continue;
+      }
+      for (const label of entry.labels) {
+        if (typeof label !== 'string') continue;
+        if (labelToGloss.has(label)) {
+          console.warn(
+            `詞彙衝突：「${label}」同時對應 ${labelToGloss.get(label)} 和 ${entry.gloss}`
+          );
+        }
+        labelToGloss.set(label, entry.gloss);
+        allLabels.push(label);
+      }
+    }
+
+    allLabels = [...new Set(allLabels)];
+    datalist.innerHTML = allLabels
+      .map(w => `<option value="${escapeHtml(w)}"></option>`)
+      .join('');
   } catch (err) {
     console.warn('詞彙庫載入失敗：', err.message);
   }
@@ -393,11 +409,7 @@ const ytApiReady = new Promise(resolve => { ytApiReadyResolve = resolve; });
 function loadYTApi() {
   if (ytApiLoaded) return;
   ytApiLoaded = true;
-
-  window.onYouTubeIframeAPIReady = () => {
-    ytApiReadyResolve();
-  };
-
+  window.onYouTubeIframeAPIReady = () => { ytApiReadyResolve(); };
   const tag = document.createElement('script');
   tag.src = 'https://www.youtube.com/iframe_api';
   document.head.appendChild(tag);
@@ -419,12 +431,10 @@ async function fetchVideoTitle(videoId) {
 // ---------- 主邏輯 ----------
 
 function main(supabase) {
-  // 狀態
   let player = null;
   let playerReady = false;
   let currentVideoId = null;
 
-  // DOM
   const videoUrlInput = document.getElementById('video-url');
   const videoTitleInput = document.getElementById('video-title');
   const loadBtn = document.getElementById('load-video-btn');
@@ -438,8 +448,6 @@ function main(supabase) {
   const searchEl = document.getElementById('search-input');
 
   let allAnnotations = [];
-
-  // ---------- 狀態工具 ----------
 
   function setStatus(msg, type) {
     statusEl.textContent = msg;
@@ -481,7 +489,6 @@ function main(supabase) {
     removeBtn.title = '移除';
     removeBtn.textContent = '✕';
 
-    // 抓時間
     startGroup.querySelector('.capture-btn').addEventListener('click', () => {
       captureTime(startGroup.querySelector('.start-input'));
     });
@@ -489,7 +496,6 @@ function main(supabase) {
       captureTime(endGroup.querySelector('.end-input'));
     });
 
-    // 移除行
     removeBtn.addEventListener('click', () => {
       const total = rowsContainer.querySelectorAll('.annotation-row').length;
       if (total > 1) {
@@ -539,10 +545,7 @@ function main(supabase) {
           height: '100%',
           playerVars: { playsinline: 1 },
           events: {
-            onReady: () => {
-              playerReady = true;
-              resolve();
-            },
+            onReady: () => { playerReady = true; resolve(); },
             onError: (e) => reject(new Error('YouTube 播放器錯誤：' + e.data)),
           },
         });
@@ -552,10 +555,7 @@ function main(supabase) {
     if (!playerReady) {
       await new Promise(resolve => {
         const check = setInterval(() => {
-          if (playerReady) {
-            clearInterval(check);
-            resolve();
-          }
+          if (playerReady) { clearInterval(check); resolve(); }
         }, 100);
       });
     }
@@ -583,13 +583,11 @@ function main(supabase) {
       currentVideoId = videoId;
       playerWrapper.classList.add('active');
 
-      // 標題：若空則嘗試自動抓
       if (!videoTitleInput.value.trim()) {
         const autoTitle = await fetchVideoTitle(videoId);
         if (autoTitle) videoTitleInput.value = autoTitle;
       }
 
-      // 換影片才重設行
       if (isNewVideo) {
         resetRows();
       }
@@ -627,7 +625,6 @@ function main(supabase) {
       const endStr = row.querySelector('.end-input').value.trim();
       const labelStr = row.querySelector('.label-input').value.trim();
 
-      // 全空的行跳過
       if (!startStr && !labelStr) return;
 
       if (!startStr) { errors.push(`第 ${rowNum} 行缺少開始時間`); return; }
@@ -643,7 +640,9 @@ function main(supabase) {
         if (endMs < startMs) { errors.push(`第 ${rowNum} 行結束時間早於開始時間`); return; }
       }
 
-      const isStandard = vocabSet.has(labelStr);
+      // 新版：用 labelToGloss 查對應的 gloss
+      const glossValue = labelToGloss.get(labelStr) || null;
+
       payloads.push({
         video_id: currentVideoId,
         video_url: normalizeUrl(currentVideoId),
@@ -651,7 +650,7 @@ function main(supabase) {
         start_ms: startMs,
         end_ms: endMs,
         label: labelStr,
-        gloss: isStandard ? labelStr : null,
+        gloss: glossValue,
       });
     });
 
