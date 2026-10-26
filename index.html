@@ -29,6 +29,11 @@
   header { margin-bottom: 24px; }
   h1 { font-size: 1.6rem; margin: 0 0 4px; }
   .subtitle { color: var(--muted); font-size: 0.9rem; margin: 0; }
+  .last-annotation-info {
+    color: var(--muted);
+    font-size: 0.78rem;
+    margin: 4px 0 0;
+  }
 
   section {
     background: var(--card);
@@ -197,7 +202,6 @@
   .action-row #add-row-btn:hover { background: #666; }
   .action-row #submit-all-btn { flex: 2 1 200px; }
 
-  /* 空狀態提示 */
   .empty-hint {
     text-align: center;
     color: var(--muted);
@@ -217,8 +221,6 @@
   }
   #submit-status.ok { color: var(--accent); }
   #submit-status.err { color: var(--danger); }
-
-  /* ---------- 該影片現有標注：弱化 + 可折疊 ---------- */
 
   .light-section {
     background: #f6f8f6;
@@ -262,8 +264,6 @@
     font-size: 0.9rem;
   }
   .current-annotations li:last-child { border-bottom: none; }
-
-  /* ---------- 所有標注列表 ---------- */
 
   #list-section { background: transparent; border: none; padding: 0; }
   #list-section h2 { padding-left: 4px; }
@@ -353,7 +353,6 @@
     .anno-grid { grid-template-columns: 1fr; }
   }
 
-  /* 兼容 current-annotations 的舊樣式 */
   .time {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 0.8rem;
@@ -373,8 +372,6 @@
     font-size: 0.8rem;
     margin-top: 32px;
   }
-
-  /* ---------- 回到頂部 ---------- */
 
   #back-to-top {
     position: fixed;
@@ -404,6 +401,7 @@
   <header>
     <h1>澳門手語標注筆記</h1>
     <p class="subtitle">階段二 B · 播放器 + 多詞提交</p>
+    <p class="last-annotation-info" id="last-annotation-info">載入中…</p>
   </header>
 
   <div class="layout">
@@ -491,6 +489,7 @@ const configError =
 if (configError) {
   document.getElementById('annotation-list').innerHTML =
     `<p class="empty">配置錯誤：${configError}。請修改 config.js 後強制重新整理（Ctrl+Shift+R / Cmd+Shift+R）。</p>`;
+  document.getElementById('last-annotation-info').textContent = '';
 } else {
   main(createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
 }
@@ -538,6 +537,40 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = String(str);
   return div.innerHTML;
+}
+
+// 把 ISO 時間轉成「相對時間（絕對時間）」
+function formatLastTime(isoString) {
+  const then = new Date(isoString);
+  if (isNaN(then.getTime())) return '';
+
+  const now = new Date();
+  const diffMs = now - then;
+  const diffSec = Math.floor(diffMs / 1000);
+
+  let relative;
+  if (diffSec < 0) {
+    relative = '剛剛';
+  } else if (diffSec < 60) {
+    relative = '剛剛';
+  } else if (diffSec < 3600) {
+    relative = `${Math.floor(diffSec / 60)} 分鐘前`;
+  } else if (diffSec < 86400) {
+    relative = `${Math.floor(diffSec / 3600)} 小時前`;
+  } else if (diffSec < 86400 * 30) {
+    relative = `${Math.floor(diffSec / 86400)} 天前`;
+  } else {
+    relative = `${Math.floor(diffSec / 86400 / 30)} 個月前`;
+  }
+
+  const y = then.getFullYear();
+  const mo = String(then.getMonth() + 1).padStart(2, '0');
+  const d = String(then.getDate()).padStart(2, '0');
+  const h = String(then.getHours()).padStart(2, '0');
+  const mi = String(then.getMinutes()).padStart(2, '0');
+  const absolute = `${y}-${mo}-${d} ${h}:${mi}`;
+
+  return `${relative}（${absolute}）`;
 }
 
 // ---------- 詞彙庫 ----------
@@ -631,12 +664,36 @@ function main(supabase) {
   const searchEl = document.getElementById('search-input');
   const rowsEmptyHint = document.getElementById('rows-empty-hint');
   const backToTopBtn = document.getElementById('back-to-top');
+  const lastAnnotationInfoEl = document.getElementById('last-annotation-info');
 
   let allAnnotations = [];
 
   function setStatus(msg, type) {
     statusEl.textContent = msg;
     statusEl.className = type || '';
+  }
+
+  // ---------- 上次標注時間 ----------
+
+  async function loadLastAnnotationTime() {
+    const { data, error } = await supabase
+      .from('annotations')
+      .select('created_at')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      lastAnnotationInfoEl.textContent = '';
+      return;
+    }
+
+    if (!data || !data.length) {
+      lastAnnotationInfoEl.textContent = '尚無標注記錄';
+      return;
+    }
+
+    const formatted = formatLastTime(data[0].created_at);
+    lastAnnotationInfoEl.textContent = `上次新增標注：${formatted}`;
   }
 
   // ---------- 啟用/禁用標注區 ----------
@@ -860,6 +917,7 @@ function main(supabase) {
     resetRows();
     await loadCurrentVideoAnnotations();
     await loadAllAnnotations();
+    await loadLastAnnotationTime();
   });
 
   // ---------- 該影片現有標注 ----------
@@ -1032,6 +1090,7 @@ function main(supabase) {
   setRowsEnabled(false);
   loadVocab();
   loadAllAnnotations();
+  loadLastAnnotationTime();
 }
 </script>
 </body>
