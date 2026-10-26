@@ -14,6 +14,9 @@
     --accent: #2c6e49;
     --accent-hover: #245c3d;
     --danger: #b00020;
+    --tag-bg: #eef3ee;
+    --tag-border: #d4e4d9;
+    --tag-text: #2c6e49;
   }
   * { box-sizing: border-box; }
   body {
@@ -79,15 +82,12 @@
     gap: 20px;
     align-items: start;
   }
-  .left-col {
-    position: sticky;
-    top: 16px;
-  }
+  .left-col { position: sticky; top: 16px; }
   .right-col { min-width: 0; }
 
   @media (min-width: 861px) {
     #annotation-rows {
-      max-height: calc(100vh - 340px);
+      max-height: calc(100vh - 400px);
       min-height: 120px;
       overflow-y: auto;
       padding-right: 4px;
@@ -132,6 +132,64 @@
     border: none;
     display: block;
   }
+
+  /* ---------- 標籤 ---------- */
+
+  .tags-section { margin-bottom: 12px; }
+  .tags-label {
+    font-size: 0.85rem;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .tag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .tag-chips:empty { display: none; }
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--tag-bg);
+    border: 1px solid var(--tag-border);
+    color: var(--tag-text);
+    padding: 2px 6px 2px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  .tag-chip .tag-remove {
+    background: transparent;
+    border: none;
+    color: var(--tag-text);
+    font-size: 0.9rem;
+    padding: 0 2px;
+    width: auto;
+    cursor: pointer;
+    opacity: 0.7;
+    line-height: 1;
+  }
+  .tag-chip .tag-remove:hover {
+    opacity: 1;
+    color: var(--danger);
+    background: transparent;
+  }
+
+  .tag-input-row {
+    display: flex;
+    gap: 6px;
+  }
+  .tag-input-row input {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 0.88rem;
+  }
+
+  /* ---------- 標注行 ---------- */
 
   .annotation-row {
     display: flex;
@@ -276,14 +334,105 @@
     margin-bottom: 12px;
   }
   .video-card:last-child { margin-bottom: 0; }
-  .video-card h3 { font-size: 1rem; margin: 0 0 4px; color: var(--text); }
-  .video-card > a {
+  .video-card.completed {
+    border-left: 3px solid var(--accent);
+    background: #fbfdfb;
+  }
+
+  .video-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .video-card-title-block {
+    flex: 1 1 240px;
+    min-width: 0;
+  }
+  .video-card-header h3 {
+    font-size: 1rem;
+    margin: 0 0 4px;
+    color: var(--text);
+    font-weight: 600;
+  }
+  .video-card-header > .video-card-title-block > a,
+  .video-card-header a {
     color: var(--accent);
     text-decoration: none;
     font-size: 0.85rem;
     word-break: break-all;
   }
-  .video-card > a:hover { text-decoration: underline; }
+  .video-card-header a:hover { text-decoration: underline; }
+
+  .completed-badge {
+    display: inline-block;
+    background: #e6f4ea;
+    color: var(--accent);
+    font-size: 0.7rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 6px 0 0;
+  }
+  .card-tag {
+    display: inline-block;
+    background: var(--tag-bg);
+    border: 1px solid var(--tag-border);
+    color: var(--tag-text);
+    padding: 0 8px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    line-height: 1.6;
+  }
+  .card-tag:hover {
+    background: var(--tag-border);
+  }
+
+  .video-card-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .continue-btn {
+    padding: 4px 12px;
+    font-size: 0.82rem;
+    border-radius: 4px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .continue-btn:hover { background: var(--accent-hover); }
+
+  .completed-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.82rem;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .completed-toggle input {
+    width: auto;
+    margin: 0;
+    cursor: pointer;
+  }
 
   .anno-grid {
     list-style: none;
@@ -327,9 +476,7 @@
     overflow-wrap: break-word;
     min-width: 0;
   }
-  .anno-grid .cell-label strong {
-    color: var(--accent);
-  }
+  .anno-grid .cell-label strong { color: var(--accent); }
 
   .anno-grid .cell-notes {
     grid-column: 1 / -1;
@@ -400,7 +547,6 @@
 
   <header>
     <h1>澳門手語標注筆記</h1>
-    <p class="subtitle">階段二 B · 播放器 + 多詞提交</p>
     <p class="last-annotation-info" id="last-annotation-info">載入中…</p>
   </header>
 
@@ -429,6 +575,20 @@
         <p class="hint">
           點 ⏱ 抓取播放器當前時間。焦點不在輸入框時，按空白鍵可暫停/播放。
         </p>
+
+        <div class="tags-section">
+          <label class="tags-label">分類標籤</label>
+          <div class="tag-chips" id="tag-chips"></div>
+          <div class="tag-input-row">
+            <input type="text" id="tag-input" list="tag-options"
+                   placeholder="輸入或選擇標籤，按 Enter 加入" autocomplete="off" disabled>
+          </div>
+          <datalist id="tag-options">
+            <option value="星期一手語"></option>
+            <option value="心靈手語"></option>
+            <option value="手語週報"></option>
+          </datalist>
+        </div>
 
         <div class="action-row">
           <button type="button" id="add-row-btn" disabled>+ 新增一行</button>
@@ -459,7 +619,7 @@
 
   <section id="list-section">
     <h2>所有標注</h2>
-    <input type="text" id="search-input" placeholder="按網址、標題或單詞搜尋…">
+    <input type="text" id="search-input" placeholder="按網址、標題、單詞或標籤搜尋…">
     <div id="annotation-list">
       <p class="empty">載入中…</p>
     </div>
@@ -539,19 +699,15 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// 把 ISO 時間轉成「相對時間（絕對時間）」
 function formatLastTime(isoString) {
   const then = new Date(isoString);
   if (isNaN(then.getTime())) return '';
 
   const now = new Date();
-  const diffMs = now - then;
-  const diffSec = Math.floor(diffMs / 1000);
+  const diffSec = Math.floor((now - then) / 1000);
 
   let relative;
-  if (diffSec < 0) {
-    relative = '剛剛';
-  } else if (diffSec < 60) {
+  if (diffSec < 60) {
     relative = '剛剛';
   } else if (diffSec < 3600) {
     relative = `${Math.floor(diffSec / 60)} 分鐘前`;
@@ -568,9 +724,8 @@ function formatLastTime(isoString) {
   const d = String(then.getDate()).padStart(2, '0');
   const h = String(then.getHours()).padStart(2, '0');
   const mi = String(then.getMinutes()).padStart(2, '0');
-  const absolute = `${y}-${mo}-${d} ${h}:${mi}`;
 
-  return `${relative}（${absolute}）`;
+  return `${relative}（${y}-${mo}-${d} ${h}:${mi}）`;
 }
 
 // ---------- 詞彙庫 ----------
@@ -650,6 +805,7 @@ function main(supabase) {
   let playerReady = false;
   let currentVideoId = null;
   let rowsEnabled = false;
+  let selectedTags = [];
 
   const videoUrlInput = document.getElementById('video-url');
   const videoTitleInput = document.getElementById('video-title');
@@ -665,6 +821,8 @@ function main(supabase) {
   const rowsEmptyHint = document.getElementById('rows-empty-hint');
   const backToTopBtn = document.getElementById('back-to-top');
   const lastAnnotationInfoEl = document.getElementById('last-annotation-info');
+  const tagChipsEl = document.getElementById('tag-chips');
+  const tagInputEl = document.getElementById('tag-input');
 
   let allAnnotations = [];
 
@@ -672,6 +830,62 @@ function main(supabase) {
     statusEl.textContent = msg;
     statusEl.className = type || '';
   }
+
+  // ---------- 標籤管理 ----------
+
+  function renderTags() {
+    tagChipsEl.innerHTML = selectedTags.map(t => `
+      <span class="tag-chip">
+        ${escapeHtml(t)}
+        <button type="button" class="tag-remove" data-tag="${escapeHtml(t)}" title="移除">×</button>
+      </span>
+    `).join('');
+  }
+
+  function addTag(rawTag) {
+    const tag = String(rawTag || '').trim();
+    if (!tag) return;
+    if (selectedTags.includes(tag)) {
+      tagInputEl.value = '';
+      return;
+    }
+    selectedTags.push(tag);
+    renderTags();
+    tagInputEl.value = '';
+  }
+
+  function removeTag(tag) {
+    selectedTags = selectedTags.filter(t => t !== tag);
+    renderTags();
+  }
+
+  tagChipsEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tag-remove');
+    if (btn) {
+      removeTag(btn.dataset.tag);
+    }
+  });
+
+  tagInputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ',' || e.key === '，') {
+      e.preventDefault();
+      addTag(tagInputEl.value);
+    } else if (e.key === 'Backspace' && !tagInputEl.value && selectedTags.length) {
+      selectedTags.pop();
+      renderTags();
+    }
+  });
+
+  tagInputEl.addEventListener('change', (e) => {
+    // 從 datalist 選中時觸發 change
+    if (e.target.value && selectedTags.includes(e.target.value)) return;
+    if (e.target.value) addTag(e.target.value);
+  });
+
+  tagInputEl.addEventListener('blur', () => {
+    // 失焦時把殘留的輸入加入
+    if (tagInputEl.value.trim()) addTag(tagInputEl.value);
+  });
 
   // ---------- 上次標注時間 ----------
 
@@ -709,6 +923,7 @@ function main(supabase) {
     rowsContainer.querySelectorAll('.annotation-row').forEach(applyRowState);
     addRowBtn.disabled = !enabled;
     submitAllBtn.disabled = !enabled;
+    tagInputEl.disabled = !enabled;
     rowsEmptyHint.style.display = enabled ? 'none' : 'block';
   }
 
@@ -810,8 +1025,21 @@ function main(supabase) {
     player.loadVideoById(videoId);
   }
 
-  loadBtn.addEventListener('click', async () => {
-    const rawUrl = videoUrlInput.value.trim();
+  async function loadExistingTags(videoId) {
+    const { data, error } = await supabase
+      .from('videos')
+      .select('tags')
+      .eq('video_id', videoId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('載入影片標籤失敗：', error.message);
+      return [];
+    }
+    return (data && Array.isArray(data.tags)) ? data.tags : [];
+  }
+
+  async function loadVideo(rawUrl) {
     const videoId = extractVideoId(rawUrl);
     if (!videoId) {
       setStatus('網址格式不正確，只接受 YouTube 連結。', 'err');
@@ -839,6 +1067,10 @@ function main(supabase) {
         resetRows();
       }
 
+      // 載入該影片已有的標籤
+      selectedTags = await loadExistingTags(videoId);
+      renderTags();
+
       setRowsEnabled(true);
       setStatus('影片已載入。', 'ok');
       await loadCurrentVideoAnnotations();
@@ -848,7 +1080,51 @@ function main(supabase) {
       loadBtn.disabled = false;
       loadBtn.textContent = '載入影片';
     }
+  }
+
+  loadBtn.addEventListener('click', () => {
+    loadVideo(videoUrlInput.value.trim());
   });
+
+  // ---------- 繼續標注 ----------
+
+  function continueAnnotating(videoId) {
+    const items = allAnnotations.filter(a => a.video_id === videoId);
+    if (!items.length) return;
+    const meta = items[0].videos || {};
+    if (!meta.video_url) {
+      setStatus('找不到該影片的網址。', 'err');
+      return;
+    }
+
+    videoUrlInput.value = meta.video_url;
+    videoTitleInput.value = meta.video_title || '';
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    loadVideo(meta.video_url);
+  }
+
+  // ---------- 切換完成狀態 ----------
+
+  async function toggleCompleted(videoId, completed) {
+    const { error } = await supabase
+      .from('videos')
+      .update({ completed })
+      .eq('video_id', videoId);
+
+    if (error) {
+      setStatus(`更新完成狀態失敗：${error.message}`, 'err');
+      return;
+    }
+
+    for (const a of allAnnotations) {
+      if (a.video_id === videoId && a.videos) {
+        a.videos.completed = completed;
+      }
+    }
+
+    applyFilter();
+  }
 
   // ---------- 提交所有行 ----------
 
@@ -884,8 +1160,6 @@ function main(supabase) {
 
       payloads.push({
         video_id: currentVideoId,
-        video_url: normalizeUrl(currentVideoId),
-        video_title: titleValue,
         start_ms: startMs,
         end_ms: null,
         label: labelStr,
@@ -905,6 +1179,26 @@ function main(supabase) {
     submitAllBtn.disabled = true;
     setStatus(`提交 ${payloads.length} 條標注中…`);
 
+    // 1. upsert 影片（含 tags）
+    const { error: videoErr } = await supabase
+      .from('videos')
+      .upsert(
+        {
+          video_id: currentVideoId,
+          video_url: normalizeUrl(currentVideoId),
+          video_title: titleValue,
+          tags: selectedTags,
+        },
+        { onConflict: 'video_id' }
+      );
+
+    if (videoErr) {
+      submitAllBtn.disabled = false;
+      setStatus(`影片資訊儲存失敗：${videoErr.message}`, 'err');
+      return;
+    }
+
+    // 2. insert annotations
     const { error } = await supabase.from('annotations').insert(payloads);
     submitAllBtn.disabled = false;
 
@@ -970,7 +1264,7 @@ function main(supabase) {
   async function loadAllAnnotations() {
     const { data, error } = await supabase
       .from('annotations')
-      .select('*')
+      .select('*, videos(video_url, video_title, completed, tags)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -978,7 +1272,7 @@ function main(supabase) {
       return;
     }
     allAnnotations = data || [];
-    renderList(allAnnotations);
+    applyFilter();
   }
 
   function renderList(annotations) {
@@ -994,15 +1288,25 @@ function main(supabase) {
     }
 
     const html = [];
-    for (const [, items] of grouped) {
+    for (const [videoId, items] of grouped) {
       items.sort((x, y) => x.start_ms - y.start_ms);
       const first = items[0];
+      const meta = first.videos || {};
+      const title = meta.video_title || '(未命名影片)';
+      const url = meta.video_url || '';
+      const completed = !!meta.completed;
+      const tags = Array.isArray(meta.tags) ? meta.tags : [];
+
+      const tagsHtml = tags.length
+        ? `<div class="card-tags">${tags.map(t =>
+            `<span class="card-tag" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</span>`
+          ).join('')}</div>`
+        : '';
 
       const itemHtml = items.map(item => {
         const timeStr = item.end_ms
           ? `${formatMs(item.start_ms)} – ${formatMs(item.end_ms)}`
           : formatMs(item.start_ms);
-
         const notesText = item.notes ? escapeHtml(item.notes) : '';
         return `
           <li>
@@ -1014,11 +1318,25 @@ function main(supabase) {
       }).join('');
 
       html.push(`
-        <div class="video-card">
-          <h3>${escapeHtml(first.video_title)}</h3>
-          <a href="${escapeHtml(first.video_url)}" target="_blank" rel="noopener">
-            ${escapeHtml(first.video_url)}
-          </a>
+        <div class="video-card ${completed ? 'completed' : ''}">
+          <div class="video-card-header">
+            <div class="video-card-title-block">
+              <h3>
+                ${escapeHtml(title)}
+                ${completed ? '<span class="completed-badge">已完成</span>' : ''}
+              </h3>
+              ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>` : ''}
+              ${tagsHtml}
+            </div>
+            <div class="video-card-actions">
+              <button type="button" class="continue-btn" data-video-id="${escapeHtml(videoId)}">繼續標注</button>
+              <label class="completed-toggle">
+                <input type="checkbox" class="completed-checkbox"
+                       data-video-id="${escapeHtml(videoId)}" ${completed ? 'checked' : ''}>
+                <span>已完成</span>
+              </label>
+            </div>
+          </div>
           <ul class="anno-grid">${itemHtml}</ul>
         </div>
       `);
@@ -1026,18 +1344,53 @@ function main(supabase) {
     listEl.innerHTML = html.join('');
   }
 
-  searchEl.addEventListener('input', () => {
+  function applyFilter() {
     const q = searchEl.value.trim().toLowerCase();
     if (!q) {
       renderList(allAnnotations);
       return;
     }
-    const filtered = allAnnotations.filter(a =>
-      a.video_url.toLowerCase().includes(q) ||
-      a.video_title.toLowerCase().includes(q) ||
-      a.label.toLowerCase().includes(q)
-    );
+    const filtered = allAnnotations.filter(a => {
+      const meta = a.videos || {};
+      const tags = Array.isArray(meta.tags) ? meta.tags : [];
+      return (
+        (meta.video_url || '').toLowerCase().includes(q) ||
+        (meta.video_title || '').toLowerCase().includes(q) ||
+        a.label.toLowerCase().includes(q) ||
+        tags.some(t => t.toLowerCase().includes(q))
+      );
+    });
     renderList(filtered);
+  }
+
+  searchEl.addEventListener('input', applyFilter);
+
+  // ---------- 列表事件委託 ----------
+
+  listEl.addEventListener('click', (e) => {
+    const continueBtn = e.target.closest('.continue-btn');
+    if (continueBtn) {
+      e.preventDefault();
+      continueAnnotating(continueBtn.dataset.videoId);
+      return;
+    }
+
+    // 點擊卡片上的 tag 快速篩選
+    const cardTag = e.target.closest('.card-tag');
+    if (cardTag) {
+      e.preventDefault();
+      searchEl.value = cardTag.dataset.tag;
+      applyFilter();
+      window.scrollTo({ top: searchEl.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
+      return;
+    }
+  });
+
+  listEl.addEventListener('change', (e) => {
+    const checkbox = e.target.closest('.completed-checkbox');
+    if (checkbox) {
+      toggleCompleted(checkbox.dataset.videoId, checkbox.checked);
+    }
   });
 
   // ---------- 新增行按鈕 ----------
