@@ -27,10 +27,34 @@
     background: var(--bg);
     color: var(--text);
     line-height: 1.6;
+    scroll-behavior: smooth;
   }
   .container { max-width: 1200px; margin: 0 auto; }
   header { margin-bottom: 24px; }
+
+  .header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
   h1 { font-size: 1.6rem; margin: 0 0 4px; }
+
+  .header-nav-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 600;
+    border-bottom: 1px dashed var(--accent);
+    padding-bottom: 1px;
+    white-space: nowrap;
+  }
+  .header-nav-link:hover {
+    color: var(--accent-hover);
+    border-bottom-style: solid;
+  }
+
   .last-annotation-info {
     color: var(--muted);
     font-size: 0.78rem;
@@ -109,8 +133,6 @@
     .left-col { position: static; }
   }
 
-  /* ---------- 影片區：h2 和標籤同一行 ---------- */
-
   .video-header {
     display: flex;
     justify-content: space-between;
@@ -182,8 +204,6 @@
     border-radius: 12px;
   }
 
-  /* ---------- 影片輸入區 ---------- */
-
   .video-inputs { display: flex; flex-direction: column; gap: 8px; }
   .url-row { display: flex; gap: 8px; }
   .url-row input { flex: 1; }
@@ -206,8 +226,6 @@
     border: none;
     display: block;
   }
-
-  /* ---------- 標注行 ---------- */
 
   .annotation-row {
     display: flex;
@@ -531,6 +549,84 @@
   .empty { color: var(--muted); font-style: italic; }
   #search-input { margin-bottom: 16px; }
 
+  /* ---------- 顯示全部按鈕 ---------- */
+
+  .show-all-btn {
+    display: block;
+    margin: 12px auto 0;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    width: auto;
+    transition: all 0.15s;
+  }
+  .show-all-btn:hover {
+    background: #fff;
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ---------- 學習網頁 ---------- */
+
+  .learning-section {
+    background: #f6f8f6;
+    border-color: #e6ebe6;
+  }
+  .learning-section h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 12px;
+    color: var(--text);
+  }
+
+  .learning-links {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px;
+  }
+  .learning-links li {
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 0.92rem;
+  }
+  .learning-links li:last-child { border-bottom: none; }
+  .learning-links a {
+    color: var(--accent);
+    text-decoration: none;
+    overflow-wrap: break-word;
+  }
+  .learning-links a:hover { text-decoration: underline; }
+
+  .back-to-top-row {
+    text-align: center;
+    margin-top: 8px;
+  }
+  .back-to-top-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .back-to-top-inline:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: #fff;
+  }
+
   footer {
     text-align: center;
     color: var(--muted);
@@ -564,7 +660,10 @@
 <div class="container">
 
   <header>
-    <h1>澳門手語標注筆記</h1>
+    <div class="header-top">
+      <h1>澳門手語標注筆記</h1>
+      <a href="#learning-section" class="header-nav-link">學習網頁</a>
+    </div>
     <p class="last-annotation-info" id="last-annotation-info">載入中…</p>
   </header>
 
@@ -641,6 +740,21 @@
     <input type="text" id="search-input" placeholder="按網址、標題、單詞或標籤搜尋…">
     <div id="annotation-list">
       <p class="empty">載入中…</p>
+    </div>
+  </section>
+
+  <section id="learning-section" class="learning-section">
+    <h2>學習網頁</h2>
+    <ul class="learning-links">
+      <li>
+        <a href="https://www.mgm.mo/zh-hant/gba-sign-languages-elearning"
+           target="_blank" rel="noopener">
+          大灣區手語網上學習平台（MGM）
+        </a>
+      </li>
+    </ul>
+    <div class="back-to-top-row">
+      <a href="#" id="back-to-top-inline" class="back-to-top-inline">↑ 回到頂部</a>
     </div>
   </section>
 
@@ -825,6 +939,13 @@ function main(supabase) {
   let currentVideoId = null;
   let rowsEnabled = false;
   let selectedTags = [];
+
+  // 顯示全部狀態
+  const SHOW_LIMIT = 8;
+  let currentAnnoShowAll = false;
+  let currentVideoAnnoData = [];
+  // 底部每張卡片各自記錄是否展開
+  const expandedVideoCards = new Set();
 
   const videoUrlInput = document.getElementById('video-url');
   const videoTitleInput = document.getElementById('video-title');
@@ -1082,6 +1203,7 @@ function main(supabase) {
 
       if (isNewVideo) {
         resetRows();
+        currentAnnoShowAll = false;
       }
 
       selectedTags = await loadExistingTags(videoId);
@@ -1139,7 +1261,7 @@ function main(supabase) {
       }
     }
 
-    applyFilter();
+    applyFilter(false);
   }
 
   // ---------- 提交所有行 ----------
@@ -1233,6 +1355,7 @@ function main(supabase) {
   async function loadCurrentVideoAnnotations() {
     if (!currentVideoId) {
       currentAnnoContainer.innerHTML = '<p class="empty">尚未載入影片。</p>';
+      currentVideoAnnoData = [];
       return;
     }
     const { data, error } = await supabase
@@ -1244,8 +1367,16 @@ function main(supabase) {
     if (error) {
       currentAnnoContainer.innerHTML =
         `<p class="empty">該影片標注載入失敗：${escapeHtml(error.message)}</p>`;
+      currentVideoAnnoData = [];
       return;
     }
+
+    currentVideoAnnoData = data || [];
+    renderCurrentAnnotations();
+  }
+
+  function renderCurrentAnnotations() {
+    const data = currentVideoAnnoData;
 
     if (!data || !data.length) {
       currentAnnoContainer.innerHTML =
@@ -1253,7 +1384,10 @@ function main(supabase) {
       return;
     }
 
-    const items = data.map(item => {
+    const showAll = currentAnnoShowAll || data.length <= SHOW_LIMIT;
+    const visible = showAll ? data : data.slice(0, SHOW_LIMIT);
+
+    const items = visible.map(item => {
       const timeStr = item.end_ms
         ? `${formatMs(item.start_ms)} – ${formatMs(item.end_ms)}`
         : formatMs(item.start_ms);
@@ -1265,13 +1399,26 @@ function main(supabase) {
       `;
     }).join('');
 
+    const showAllBtn = !showAll
+      ? `<button type="button" class="show-all-btn" data-target="current-anno">顯示全部（共 ${data.length} 條）</button>`
+      : '';
+
     currentAnnoContainer.innerHTML = `
       <div class="current-annotations">
         <p style="margin:0 0 8px; color:#666; font-size:0.85rem;">共 ${data.length} 條</p>
         <ul>${items}</ul>
+        ${showAllBtn}
       </div>
     `;
   }
+
+  currentAnnoContainer.addEventListener('click', (e) => {
+    const btn = e.target.closest('.show-all-btn[data-target="current-anno"]');
+    if (btn) {
+      currentAnnoShowAll = true;
+      renderCurrentAnnotations();
+    }
+  });
 
   // ---------- 所有標注列表 ----------
 
@@ -1286,7 +1433,7 @@ function main(supabase) {
       return;
     }
     allAnnotations = data || [];
-    applyFilter();
+    applyFilter(false);
   }
 
   function renderList(annotations) {
@@ -1317,7 +1464,12 @@ function main(supabase) {
           ).join('')}</div>`
         : '';
 
-      const itemHtml = items.map(item => {
+      // 每張卡片內部：最多顯示 SHOW_LIMIT 條，超過時摺疊
+      const expanded = expandedVideoCards.has(videoId);
+      const showAllItems = expanded || items.length <= SHOW_LIMIT;
+      const visibleItems = showAllItems ? items : items.slice(0, SHOW_LIMIT);
+
+      const itemHtml = visibleItems.map(item => {
         const timeStr = item.end_ms
           ? `${formatMs(item.start_ms)} – ${formatMs(item.end_ms)}`
           : formatMs(item.start_ms);
@@ -1330,6 +1482,10 @@ function main(supabase) {
           </li>
         `;
       }).join('');
+
+      const cardShowAllBtn = !showAllItems
+        ? `<button type="button" class="show-all-btn" data-target="card" data-video-id="${escapeHtml(videoId)}">顯示全部（共 ${items.length} 條）</button>`
+        : '';
 
       html.push(`
         <div class="video-card ${completed ? 'completed' : ''}">
@@ -1352,19 +1508,18 @@ function main(supabase) {
             </div>
           </div>
           <ul class="anno-grid">${itemHtml}</ul>
+          ${cardShowAllBtn}
         </div>
       `);
     }
+
     listEl.innerHTML = html.join('');
   }
 
-  function applyFilter() {
+  function getFilteredAnnotations() {
     const q = searchEl.value.trim().toLowerCase();
-    if (!q) {
-      renderList(allAnnotations);
-      return;
-    }
-    const filtered = allAnnotations.filter(a => {
+    if (!q) return allAnnotations;
+    return allAnnotations.filter(a => {
       const meta = a.videos || {};
       const tags = Array.isArray(meta.tags) ? meta.tags : [];
       return (
@@ -1374,14 +1529,25 @@ function main(supabase) {
         tags.some(t => t.toLowerCase().includes(q))
       );
     });
-    renderList(filtered);
   }
 
-  searchEl.addEventListener('input', applyFilter);
+  function applyFilter(resetExpanded = false) {
+    if (resetExpanded) expandedVideoCards.clear();
+    renderList(getFilteredAnnotations());
+  }
+
+  searchEl.addEventListener('input', () => applyFilter(true));
 
   // ---------- 列表事件委託 ----------
 
   listEl.addEventListener('click', (e) => {
+    const cardShowAllBtn = e.target.closest('.show-all-btn[data-target="card"]');
+    if (cardShowAllBtn) {
+      expandedVideoCards.add(cardShowAllBtn.dataset.videoId);
+      applyFilter(false);
+      return;
+    }
+
     const continueBtn = e.target.closest('.continue-btn');
     if (continueBtn) {
       e.preventDefault();
@@ -1393,7 +1559,7 @@ function main(supabase) {
     if (cardTag) {
       e.preventDefault();
       searchEl.value = cardTag.dataset.tag;
-      applyFilter();
+      applyFilter(true);
       window.scrollTo({ top: searchEl.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' });
       return;
     }
@@ -1428,6 +1594,11 @@ function main(supabase) {
   }, { passive: true });
 
   backToTopBtn.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  document.getElementById('back-to-top-inline').addEventListener('click', (e) => {
+    e.preventDefault();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
