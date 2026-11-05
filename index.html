@@ -31,7 +31,6 @@
   .container { max-width: 1200px; margin: 0 auto; }
   header { margin-bottom: 24px; }
   h1 { font-size: 1.6rem; margin: 0 0 4px; }
-  .subtitle { color: var(--muted); font-size: 0.9rem; margin: 0; }
   .last-annotation-info {
     color: var(--muted);
     font-size: 0.78rem;
@@ -133,8 +132,6 @@
     display: block;
   }
 
-  /* ---------- 標籤 ---------- */
-
   .tags-section { margin-bottom: 12px; }
   .tags-label {
     font-size: 0.85rem;
@@ -188,8 +185,6 @@
     padding: 6px 8px;
     font-size: 0.88rem;
   }
-
-  /* ---------- 標注行 ---------- */
 
   .annotation-row {
     display: flex;
@@ -877,13 +872,11 @@ function main(supabase) {
   });
 
   tagInputEl.addEventListener('change', (e) => {
-    // 從 datalist 選中時觸發 change
     if (e.target.value && selectedTags.includes(e.target.value)) return;
     if (e.target.value) addTag(e.target.value);
   });
 
   tagInputEl.addEventListener('blur', () => {
-    // 失焦時把殘留的輸入加入
     if (tagInputEl.value.trim()) addTag(tagInputEl.value);
   });
 
@@ -1067,7 +1060,6 @@ function main(supabase) {
         resetRows();
       }
 
-      // 載入該影片已有的標籤
       selectedTags = await loadExistingTags(videoId);
       renderTags();
 
@@ -1179,7 +1171,6 @@ function main(supabase) {
     submitAllBtn.disabled = true;
     setStatus(`提交 ${payloads.length} 條標注中…`);
 
-    // 1. upsert 影片（含 tags）
     const { error: videoErr } = await supabase
       .from('videos')
       .upsert(
@@ -1198,7 +1189,6 @@ function main(supabase) {
       return;
     }
 
-    // 2. insert annotations
     const { error } = await supabase.from('annotations').insert(payloads);
     submitAllBtn.disabled = false;
 
@@ -1225,7 +1215,7 @@ function main(supabase) {
       .from('annotations')
       .select('*')
       .eq('video_id', currentVideoId)
-      .order('start_ms', { ascending: true });
+      .order('start_ms', { ascending: false });
 
     if (error) {
       currentAnnoContainer.innerHTML =
@@ -1375,7 +1365,6 @@ function main(supabase) {
       return;
     }
 
-    // 點擊卡片上的 tag 快速篩選
     const cardTag = e.target.closest('.card-tag');
     if (cardTag) {
       e.preventDefault();
